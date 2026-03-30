@@ -109,3 +109,13 @@ This project demonstrates a modular AI system combining:
 - Execution (Tools)
 
 to build a practical **AI-powered code assistant**.
+
+
+## Future Improvements
+- Switch to tool-calling agent (more stable than ReAct)
+- Better chunking strategy, say, AST (Abstract Syntax Tree), maybe a code graph
+- Enable hybrid retrieval combining semantic search (embeddings) and keyword search (function names, variables)
+- Add support to query and work for a remote repo
+- Evaluation - define metrics
+- Packaging
+- CI/CD
