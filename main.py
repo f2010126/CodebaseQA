@@ -1,11 +1,14 @@
 from app.agent import build_agent
 from app.config import logger
 
-# for testing
-
 
 def get_agent():
     return build_agent()
+
+
+def run_query(agent, query: str):
+    logger.debug(f"[USER QUERY] {query}")
+    return agent.invoke({"input": query})
 
 
 def start_agent():
@@ -18,9 +21,7 @@ def start_agent():
             if query.lower() in ["exit", "quit"]:
                 break
 
-            logger.debug(f"[USER QUERY] {query}")
-
-            result = agent.invoke({"input": query})
+            result = run_query(agent, query)
 
             print("\n--- ANSWER ---\n")
             print(result.get("output", "No output returned"))
