@@ -6,28 +6,37 @@ def search_codebase(query: str) -> str:
     logger.debug(f"[TOOL] search_codebase called with query: {query}")
 
     try:
-        retriever = get_retriever()  # moved inside for testcases
+        retriever = get_retriever()
 
         docs = retriever.invoke(query)
 
         if not docs:
-            logger.warning("No documents retrieved")
+            logger.warning(f"[TOOL] No documents retrieved for query: {query}")
             return "No relevant code found."
 
-        formatted = []
-        for d in docs:
-            source = d.metadata.get("source", "unknown")
-            formatted.append(f"FILE: {source}\n{d.page_content}")
+        formatted_chunks = []
 
-        result = "\n\n".join(formatted)
+        for doc in docs:
+            source = doc.metadata.get("source", "unknown")
 
-        logger.debug(f"[TOOL] Retrieved {len(docs)} documents")
+            formatted_chunks.append(
+                f"FILE: {source}\n"
+                f"CODE:\n{doc.page_content}\n"
+                f"{'-' * 40}"
+            )
+
+        result = "\n\n".join(formatted_chunks)
+
+        logger.debug(
+            f"[TOOL] Retrieved {len(docs)} documents for query: {query}"
+        )
+
         return result
 
     except Exception as e:
-        logger.error(f"[TOOL ERROR] search_codebase failed: {e}")
+        logger.exception("[TOOL ERROR] search_codebase failed")
         return "Error retrieving codebase."
 
 
 if __name__ == "__main__":
-    search_codebase("test")
+    print(search_codebase("test"))

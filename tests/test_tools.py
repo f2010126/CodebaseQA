@@ -13,8 +13,7 @@ class TestTools(unittest.TestCase):
             page_content="def foo(): pass",
             metadata={"source": "main.py"}
         )
-
-        mock_retriever.get_relevant_documents.return_value = [mock_doc]
+        mock_retriever.invoke.return_value = [mock_doc]
 
         result = search_codebase("foo")
 
@@ -24,7 +23,7 @@ class TestTools(unittest.TestCase):
     @patch("app.tools.get_retriever")  # its a call now
     def test_search_codebase_empty(self, mock_get_retriever):
         mock_retriever = mock_get_retriever.return_value  # the actual value
-        mock_retriever.get_relevant_documents.return_value = []
+        mock_retriever.invoke.return_value = []
 
         result = search_codebase("nothing")
 
@@ -33,7 +32,7 @@ class TestTools(unittest.TestCase):
     @patch("app.tools.get_retriever")
     def test_search_codebase_error(self, mock_get_retriever):
         mock_retriever = mock_get_retriever.return_value  # the actual value
-        mock_retriever.get_relevant_documents.side_effect = Exception("fail")
+        mock_retriever.invoke.side_effect = Exception("fail")
 
         result = search_codebase("error")
 

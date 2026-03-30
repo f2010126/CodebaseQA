@@ -2,7 +2,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.agents import create_react_agent, AgentExecutor
 from langchain_core.tools import Tool
-from langsmith import Client  # for known prompts
+from langsmith import Client
 from app.config import logger
 from app.tools import search_codebase
 
@@ -34,7 +34,30 @@ def build_tools():
             Tool(
                 name="search_codebase",
                 func=search_codebase,
-                description="Search the codebase for relevant files and code snippets"
+                description="""
+Search the repository codebase for relevant files and code snippets.
+
+Use this tool when the user asks about:
+- code structure
+- functions
+- implementation details
+- logging
+- utilities
+- debugging code
+
+STRICT FORMAT RULES (VERY IMPORTANT):
+- Action must be: search_codebase
+- Action Input must be a plain string only
+- DO NOT use function-call syntax
+
+CORRECT:
+Action: search_codebase
+Action Input: logging
+
+INCORRECT:
+search_codebase(query="logging")
+search_codebase("logging")
+"""
             )
         ]
 
@@ -59,7 +82,7 @@ def build_agent() -> AgentExecutor:
         tools = build_tools()
 
         logger.info("Creating ReAct agent...")
-        # USE A PRompt template
+
         client = Client()
         prompt = client.pull_prompt("hwchase17/react")
 
