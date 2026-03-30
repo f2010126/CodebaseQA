@@ -53,6 +53,7 @@ class TestBuildIndex(unittest.TestCase):
                 data_path="data/fake_repo_agent"
             )
 
+    # expect an error stack here.
     @patch("ingest.build_index.FAISS")
     @patch("ingest.build_index.GoogleGenerativeAIEmbeddings")
     @patch("ingest.build_index.DirectoryLoader")

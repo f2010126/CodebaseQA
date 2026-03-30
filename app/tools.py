@@ -1,13 +1,13 @@
 from app.rag import get_retriever
 from app.config import logger
 
-retriever = get_retriever()
-
 
 def search_codebase(query: str) -> str:
     logger.debug(f"[TOOL] search_codebase called with query: {query}")
 
     try:
+        retriever = get_retriever()  # moved inside for testcases
+
         docs = retriever.get_relevant_documents(query)
 
         if not docs:
@@ -27,3 +27,7 @@ def search_codebase(query: str) -> str:
     except Exception as e:
         logger.error(f"[TOOL ERROR] search_codebase failed: {e}")
         return "Error retrieving codebase."
+
+
+if __name__ == "__main__":
+    search_codebase("test")
