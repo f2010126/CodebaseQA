@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import main
 
 
 class TestMain(unittest.TestCase):
@@ -16,6 +17,7 @@ class TestMain(unittest.TestCase):
         result = agent.invoke({"input": "test"})
 
         self.assertEqual(result["output"], "test answer")
+        mock_agent.invoke.assert_called_once()
 
 
 if __name__ == "__main__":
