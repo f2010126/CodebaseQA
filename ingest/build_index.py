@@ -3,6 +3,11 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import os
+from dotenv import load_dotenv
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,7 +21,7 @@ def run_indexing(data_path="data/fake_repo_agent", save_path="vectorstore"):
     """
 
     try:
-        logger.info(f"Loading documents from: {data_path}")
+        logger.info(f"Loading documents from: {data_path}. Currently only .py")
 
         loader = DirectoryLoader(data_path, glob="**/*.py")
         docs = loader.load()
@@ -42,7 +47,7 @@ def run_indexing(data_path="data/fake_repo_agent", save_path="vectorstore"):
 
         try:
             embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001"
+                model="gemini-embedding-2-preview"
             )
         except Exception as e:
             logger.error(f"Failed to initialize embeddings: {e}")

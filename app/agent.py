@@ -2,11 +2,9 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.agents import create_react_agent, AgentExecutor
 from langchain_core.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langsmith import Client  # for known prompts
 from app.config import logger
 from app.tools import search_codebase
-from app.prompts import SYSTEM_PROMPT
 
 
 # Factory
