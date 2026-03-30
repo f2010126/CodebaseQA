@@ -2,8 +2,8 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.agents import create_react_agent, AgentExecutor
 from langchain_core.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate
-
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langsmith import Client  # for known prompts
 from app.config import logger
 from app.tools import search_codebase
 from app.prompts import SYSTEM_PROMPT
@@ -62,7 +62,9 @@ def build_agent() -> AgentExecutor:
 
         logger.info("Creating ReAct agent...")
         # USE A PRompt template
-        prompt = ChatPromptTemplate.from_template(SYSTEM_PROMPT)
+        client = Client()
+        prompt = client.pull_prompt("hwchase17/react")
+
         agent = create_react_agent(
             llm=llm,
             tools=tools,
