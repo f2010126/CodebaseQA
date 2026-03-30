@@ -8,7 +8,7 @@ def search_codebase(query: str) -> str:
     try:
         retriever = get_retriever()  # moved inside for testcases
 
-        docs = retriever.get_relevant_documents(query)
+        docs = retriever.invoke(query)
 
         if not docs:
             logger.warning("No documents retrieved")

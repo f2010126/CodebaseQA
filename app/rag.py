@@ -10,7 +10,7 @@ from app.config import logger
 def load_vectorstore(path="vectorstore"):
     try:
         embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001"
+            model="gemini-embedding-2-preview"
         )
 
         vs = FAISS.load_local(
