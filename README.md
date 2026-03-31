@@ -5,6 +5,7 @@ This project is a lightweight **code-aware agent** that can answer questions abo
 
 It enables **natural language querying over a local codebase** and retrieves relevant code snippets to support answers.
 
+The end goal is to add functionality till an orchestration pattern is required. I want to know the most an AI agent can do within the bounds of good design practises. 
 ---
 
 ## Overview
@@ -92,30 +93,22 @@ Embedded Codebase (FAISS)
 
 ---
 
-## Future Improvements
-
-- Switch to a **tool-calling agent** (more stable than ReAct)  
-- Improve chunking strategy for better retrieval quality  
-- Add support for querying **remote repositories (e.g., GitHub)**  
-
----
-
 ## Summary
 
-This project demonstrates a modular AI system combining:
+This project is a modular AI system combining:
 
 - Retrieval (RAG)
 - Reasoning (Agent loop)
 - Execution (Tools)
 
-to build a practical **AI-powered code assistant**.
+to build a practical **AI-powered code assistant**. 
 
-
+---
 ## Future Improvements
 - Switch to tool-calling agent (more stable than ReAct)
 - Better chunking strategy, say, AST (Abstract Syntax Tree), maybe a code graph
 - Enable hybrid retrieval combining semantic search (embeddings) and keyword search (function names, variables)
-- Add support to query and work for a remote repo
+- Add support for querying **remote repositories (e.g., GitHub)** 
 - Evaluation - define metrics
 - Packaging
 - CI/CD
