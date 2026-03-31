@@ -1,7 +1,7 @@
 
 # Code-QA
 
-This project is a lightweight **code-aware AI agent** that can answer questions about a repository.
+This project is a lightweight **code-aware agent** that can answer questions about a repository.
 
 It enables **natural language querying over a local codebase** and retrieves relevant code snippets to support answers.
 
@@ -9,13 +9,13 @@ It enables **natural language querying over a local codebase** and retrieves rel
 
 ## Overview
 
-This is a **RAG-powered Agentic AI system** that combines:
+**RAG-powered Agentic AI system** that combines:
 
 - Semantic code retrieval  
 - LLM reasoning loop  
 - Tool-based execution  
 
-to create an interactive AI code assistant for repositories.
+to create an interactive  AI assistant for repositories.
 
 ---
 
