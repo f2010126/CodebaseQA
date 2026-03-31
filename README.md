@@ -3,9 +3,10 @@
 
 This project is a lightweight **code-aware agent** that can answer questions about a repository.
 
-It enables **natural language querying over a local codebase** and retrieves relevant code snippets to support answers.
+It enables **natural language querying over a local codebase** and retrieves relevant code snippets to support answers.**
 
 The end goal is to add functionality till an orchestration pattern is required. I want to know the most an AI agent can do within the bounds of good design practises. 
+
 ---
 
 ## Overview
