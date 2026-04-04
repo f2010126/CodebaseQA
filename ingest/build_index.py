@@ -1,14 +1,14 @@
 import logging
 from pathlib import Path
-from typing import Optional, List
 from pydantic_settings import BaseSettings
-from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
-
+from langchain_community.document_loaders.generic import GenericLoader
+from langchain_community.document_loaders.parsers import LanguageParser
+from langchain_community.document_loaders.blob_loaders import FileSystemBlobLoader
 # setting up in one place
 
 
@@ -59,14 +59,22 @@ def get_embeddings_model():
 
 def run_indexing(data_path: str = "data/fake_repo_agent"):
     # Indexing Pipeline
-
     source_dir = Path(data_path)
     repo_name = source_dir.name
     save_path = settings.vectorstore_root / repo_name
 
     # load  glob and validation
     logger.info(f"Scanning {source_dir} for Python files...")
-    loader = DirectoryLoader(str(source_dir), glob="**/*.py")
+    # ensure glob or exclude patterns are tight to avoid .venv/ or __pycache__/
+    # parser_threshold=500 means files smaller than 500 lines
+    # get special AST treatment for splitting.
+
+    loader = GenericLoader(
+        blob_loader=FileSystemBlobLoader(str(source_dir), glob="**/*.py",
+                                         suffixes=[".py"], show_progress=True),
+        blob_parser=LanguageParser(
+            language=Language.PYTHON, parser_threshold=500),
+    )
 
     try:
         docs = loader.load()
@@ -80,14 +88,15 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
     # python-aware splitting
     splitter = RecursiveCharacterTextSplitter.from_language(
         language=Language.PYTHON,
-        chunk_size=1000,
-        chunk_overlap=150
+        chunk_size=1500,  # for better code context
+        chunk_overlap=200  # catch indentation/headers
     )
 
     chunks = splitter.split_documents(docs)
     for chunk in chunks:
         chunk.metadata["repo"] = repo_name
-        # Add source path for easier debugging in the assistant
+        # LanguageParser adds "content_type" (e.g., 'function_definition')
+        # and "source" to metadata automatically.
         chunk.metadata["source_file"] = Path(
             chunk.metadata.get("source", "")).name
 
