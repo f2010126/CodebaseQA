@@ -9,3 +9,5 @@ coverage
 langsmith
 unstructured
 shutil
+rank_bm25
+pydantic-settings

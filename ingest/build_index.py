@@ -1,7 +1,7 @@
 import logging
 import shutil
 from pathlib import Path
-
+import pickle
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_community.vectorstores import FAISS
@@ -9,23 +9,11 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_community.document_loaders.blob_loaders import FileSystemBlobLoader
-from langchain_community.document_loaders import TextLoader
+from langchain_community.retrievers import BM25Retriever
 
-# setting up in one place
+# Import the centralized settings and logger
+from app.config import settings, logger
 
-
-class Settings(BaseSettings):
-    google_api_key: str
-    debug: bool = False
-    repo_registry_path: Path = Path("data/repos.txt")
-    vectorstore_root: Path = Path("vectorstore")
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-
-settings = Settings()
-logging.basicConfig(
-    level=logging.INFO if not settings.debug else logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 # default is the fake repo agent
 REPO_REGISTRY_PATH = "data/repos.txt"  # Hard coded. Change it when possible
@@ -68,7 +56,8 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
         except Exception as e:
             # No what? just append I guess
             logger.error(f"Failed to clear existing index: {e}")
-
+    # create structure
+    save_path.mkdir(parents=True, exist_ok=True)
     all_docs = []
     # load  glob and validation
     logger.info(f"Scanning {source_dir} for Python files...")
@@ -131,7 +120,12 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
         db = FAISS.from_documents(chunks, embeddings)
         db.save_local(str(save_path))
         register_repo(repo_name)
-        logger.info(f"Index saved at: {save_path}")
+        # adding exact keyword searching using BM25
+        bm25_retriever = BM25Retriever.from_documents(chunks)
+        with open(save_path / "bm25_retriever.pkl", "wb") as f:
+            pickle.dump(bm25_retriever, f)
+        logger.info(f"Hybrid indexing saved at: {save_path}")
+
         return db
 
     except Exception as e:

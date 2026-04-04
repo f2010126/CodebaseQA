@@ -15,7 +15,6 @@ class TestBuildIndex(unittest.TestCase):
         self.repo_name = "fake_repo_agent"
         # Reset settings for isolated testing
         settings.vectorstore_root = Path("test_vectorstore")
-        settings.repo_registry_path = Path("test_data/repos.txt")
 
     @patch("ingest.build_index.shutil.rmtree")
     @patch("ingest.build_index.GenericLoader")
