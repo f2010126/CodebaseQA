@@ -9,6 +9,8 @@ from pathlib import Path
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_community.document_loaders.blob_loaders import FileSystemBlobLoader
+import shutil
+
 # setting up in one place
 
 
@@ -63,6 +65,16 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
     repo_name = source_dir.name
     save_path = settings.vectorstore_root / repo_name
 
+    # --- Clean-Slate Logic ---
+    if save_path.exists():
+        logger.info(
+            f"Existing index found for {repo_name}. Wiping to prevent duplicates.")
+        try:
+            shutil.rmtree(save_path)
+        except Exception as e:
+            # No what? just append I guess
+            logger.error(f"Failed to clear existing index: {e}")
+
     # load  glob and validation
     logger.info(f"Scanning {source_dir} for Python files...")
     # ensure glob or exclude patterns are tight to avoid .venv/ or __pycache__/
@@ -104,15 +116,9 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
     embeddings = get_embeddings_model()
 
     try:
-        if save_path.exists():
-            logger.info(f"Updating existing index at {save_path}")
-            db = FAISS.load_local(str(save_path), embeddings,
-                                  allow_dangerous_deserialization=True)
-            db.add_documents(chunks)
-        else:
-            logger.info(f"Creating new index for {repo_name}")
-            db = FAISS.from_documents(chunks, embeddings)
-
+        # always create a NEW index
+        logger.info(f"Creating fresh index for {repo_name}")
+        db = FAISS.from_documents(chunks, embeddings)
         db.save_local(str(save_path))
         register_repo(repo_name)
         logger.info(f"Index saved at: {save_path}")

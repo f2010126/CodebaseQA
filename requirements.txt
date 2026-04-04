@@ -8,3 +8,4 @@ unittest
 coverage
 langsmith
 unstructured
+shutil
