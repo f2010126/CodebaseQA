@@ -119,3 +119,4 @@ to build a practical **AI-powered code assistant**.
 - Evaluation - define metrics
 - Packaging
 - CI/CD
+- Add support for more file formats. Currently only .py is supported. 

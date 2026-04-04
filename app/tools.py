@@ -7,7 +7,6 @@ def search_codebase(query: str) -> str:
 
     try:
         retriever = get_retriever()
-
         docs = retriever.invoke(query)
 
         if not docs:
@@ -18,8 +17,10 @@ def search_codebase(query: str) -> str:
 
         for doc in docs:
             source = doc.metadata.get("source", "unknown")
+            repo = doc.metadata.get("repo", "unknown")  # use metadata
 
             formatted_chunks.append(
+                f"REPO: {repo}\n"
                 f"FILE: {source}\n"
                 f"CODE:\n{doc.page_content}\n"
                 f"{'-' * 40}"
@@ -30,7 +31,6 @@ def search_codebase(query: str) -> str:
         logger.debug(
             f"[TOOL] Retrieved {len(docs)} documents for query: {query}"
         )
-
         return result
 
     except Exception as e:

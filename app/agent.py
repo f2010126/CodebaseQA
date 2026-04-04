@@ -3,11 +3,22 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.agents import create_react_agent, AgentExecutor
 from langchain_core.tools import Tool
 from langsmith import Client
+import os
 from app.config import logger
 from app.tools import search_codebase
 
 
+def load_repos():
+    path = "data/repos.txt"
+    if not os.path.exists(path):
+        return []
+
+    with open(path, "r") as f:
+        return [line.strip() for line in f.readlines()]
+
 # Factory
+
+
 def build_llm():
     try:
         logger.info("Initializing LLM (Gemini)...")
@@ -82,9 +93,10 @@ def build_agent() -> AgentExecutor:
         tools = build_tools()
 
         logger.info("Creating ReAct agent...")
-
+        repos = load_repos()
         client = Client()
-        prompt = client.pull_prompt("hwchase17/react")
+        prompt = client.pull_prompt(
+            "hwchase17/react").partial(repos=", ".join(repos))
 
         agent = create_react_agent(
             llm=llm,
