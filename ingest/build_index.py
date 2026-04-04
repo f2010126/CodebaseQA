@@ -1,17 +1,33 @@
 import logging
+from pathlib import Path
+from typing import Optional, List
+from pydantic_settings import BaseSettings
 from langchain_community.document_loaders import DirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
+# setting up in one place
 
 
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+class Settings(BaseSettings):
+    google_api_key: str
+    debug: bool = False
+    repo_registry_path: Path = Path("data/repos.txt")
+    vectorstore_root: Path = Path("vectorstore")
 
-logging.basicConfig(level=logging.INFO)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
+
+
+settings = Settings()
+
+logging.basicConfig(
+    level=logging.INFO if not settings.debug else logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # default is the fake repo agent
@@ -20,95 +36,81 @@ REPO_REGISTRY_PATH = "data/repos.txt"  # Hard coded. Change it when possible
 
 
 def register_repo(repo_name):
-    """Save to repos.txt, avoid duplicates"""
-    os.makedirs("data", exist_ok=True)
+    """repo registration"""
+    settings.repo_registry_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if not os.path.exists(REPO_REGISTRY_PATH):
-        with open(REPO_REGISTRY_PATH, "w") as f:
-            f.write(repo_name + "\n")
-        return
+    existing_repos = set()
+    if settings.repo_registry_path.exists():
+        existing_repos = {
+            line.strip() for line in settings.repo_registry_path.read_text().splitlines()}
 
-    with open(REPO_REGISTRY_PATH, "r+") as f:
-        repos = {line.strip() for line in f.readlines()}
-        if repo_name not in repos:
-            f.write(repo_name + "\n")
+    if repo_name not in existing_repos:
+        with open(settings.repo_registry_path, "a") as f:
+            f.write(f"{repo_name}\n")
 
 
-def run_indexing(data_path="data/fake_repo_agent", save_path="vectorstore"):
-    """
-    FAISS index from a local repo directory.
-    """
+def get_embeddings_model():
+    """ init model """
+    return GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview",
+        google_api_key=settings.google_api_key
+    )
+
+
+def run_indexing(data_path: str = "data/fake_repo_agent"):
+    # Indexing Pipeline
+
+    source_dir = Path(data_path)
+    repo_name = source_dir.name
+    save_path = settings.vectorstore_root / repo_name
+
+    # load  glob and validation
+    logger.info(f"Scanning {source_dir} for Python files...")
+    loader = DirectoryLoader(str(source_dir), glob="**/*.py")
+
     try:
-        logger.info(f"Loading documents from: {data_path}. Currently only .py")
-        repo_name = os.path.basename(data_path)
-        save_path = f"vectorestore/{repo_name}"
-        logger.info(f"Indexing repo: {repo_name}")
-        # load the repo. Currently only .py
-        loader = DirectoryLoader(data_path, glob="**/*.py")
         docs = loader.load()
-
         if not docs:
-            logger.warning("No documents found in data path.")
+            logger.warning(f"No .py files found in {source_dir}")
             return None
+    except Exception as e:
+        logger.error(f"Failed to load documents: {e}")
+        return None
 
-        logger.info(f"Loaded {len(docs)} documents")
-        # added some metadata, might even add something for branches
-        for doc in docs:
-            doc.metadata["repo"] = repo_name
+    # python-aware splitting
+    splitter = RecursiveCharacterTextSplitter.from_language(
+        language=Language.PYTHON,
+        chunk_size=1000,
+        chunk_overlap=150
+    )
 
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,
-            chunk_overlap=100
-        )
+    chunks = splitter.split_documents(docs)
+    for chunk in chunks:
+        chunk.metadata["repo"] = repo_name
+        # Add source path for easier debugging in the assistant
+        chunk.metadata["source_file"] = Path(
+            chunk.metadata.get("source", "")).name
 
-        chunks = splitter.split_documents(docs)
+    # 3. Vector Store Management
+    embeddings = get_embeddings_model()
 
-        if not chunks:
-            logger.warning("No chunks created from documents.")
-            return None
+    try:
+        if save_path.exists():
+            logger.info(f"Updating existing index at {save_path}")
+            db = FAISS.load_local(str(save_path), embeddings,
+                                  allow_dangerous_deserialization=True)
+            db.add_documents(chunks)
+        else:
+            logger.info(f"Creating new index for {repo_name}")
+            db = FAISS.from_documents(chunks, embeddings)
 
-        logger.info(f"Created {len(chunks)} chunks")
-
-        # repo metadata persists after split
-        for chunk in chunks:
-            chunk.metadata["repo"] = repo_name
-
-        try:
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="gemini-embedding-2-preview"
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize embeddings: {e}")
-            raise
-
-        try:
-            # append vector store or create new stuff
-            if os.path.exists(save_path):
-                logger.info("Loading existing vectorstore...")
-                db = FAISS.load_local(
-                    save_path,
-                    embeddings,
-                    allow_dangerous_deserialization=True)
-                db.add_documents(chunks)
-            else:
-                # new
-                logger.info("New vectorstore...")
-                db = FAISS.from_documents(chunks, embeddings)
-        except Exception as e:
-            logger.error(f"FAISS index creation failed: {e}")
-            raise
-
-        try:
-            db.save_local(save_path)
-        except Exception as e:
-            logger.error(f"Failed to save vector store: {e}")
-            raise
+        db.save_local(str(save_path))
         register_repo(repo_name)
         logger.info(f"Index saved at: {save_path}")
         return db
 
     except Exception as e:
-        logger.exception(f"Indexing pipeline failed: {e}")
+        logger.exception("Vector store operation failed")
         raise
 
 
