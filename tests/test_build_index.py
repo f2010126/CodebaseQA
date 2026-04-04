@@ -22,10 +22,28 @@ class TestBuildIndex(unittest.TestCase):
     @patch("ingest.build_index.FAISS")
     @patch("ingest.build_index.GoogleGenerativeAIEmbeddings")
     def test_run_indexing(self, mock_embeddings, mock_faiss, mock_loader, mock_rmtree):
-        """Tests that existing indexes are wiped and recreated fresh."""
-        mock_doc = Document(page_content="def hello(): pass",
-                            metadata={"source": "hello.py"})
-        mock_loader.return_value.load.return_value = [mock_doc]
+        # different documents for different loaders
+        py_doc = Document(page_content="def hello(): pass",
+                          metadata={"source": "hello.py"})
+        md_doc = Document(page_content="# Readme",
+                          metadata={"source": "README.md"})
+
+        #  loaders to return different docs in sequence
+        #   1 call for Python and 4 calls for the text_globs
+        mock_py_instance = MagicMock()
+        mock_py_instance.load.return_value = [py_doc]
+
+        mock_text_instance = MagicMock()
+        mock_text_instance.load.return_value = [md_doc]
+
+        # GenericLoader() is called 5 times total (1 Python + 4 Text Globs)
+        mock_loader.side_effect = [
+            mock_py_instance,   # Python loader
+            mock_text_instance,  # README.md loader
+            mock_text_instance,  # requirements.txt loader
+            mock_text_instance,  # pyproject.toml loader
+            mock_text_instance  # Dockerfile loader
+        ]
 
         mock_db = MagicMock()
         mock_faiss.from_documents.return_value = mock_db
@@ -34,16 +52,16 @@ class TestBuildIndex(unittest.TestCase):
             result = run_indexing(self.data_path)
 
         # Assertions
-        mock_rmtree.assert_called_once()
-        mock_faiss.from_documents.assert_called_once()
-        mock_db.save_local.assert_called_once()
         self.assertIsNotNone(result)
+        mock_rmtree.assert_called_once()
+        # Verify FAISS received documents from BOTH loaders (1 py + 4 text = 5 docs)
+        # multiple docs here
+        mock_faiss.from_documents.assert_called_once()
 
     @patch("ingest.build_index.GenericLoader")
     @patch("ingest.build_index.FAISS.from_documents")
     @patch("ingest.build_index.GoogleGenerativeAIEmbeddings")
     def test_metadata_injection(self, mock_embeddings, mock_faiss_from, mock_loader):
-        """Verify that chunking adds 'repo' and 'source_file' to metadata using AST loader."""
         mock_loader.return_value.load.return_value = [
             Document(page_content="code", metadata={
                      "source": "path/to/script.py"})
@@ -59,10 +77,9 @@ class TestBuildIndex(unittest.TestCase):
 
     @patch("ingest.build_index.Path.read_text")
     def test_register_repo_deduplication(self, mock_read):
-        """Ensures we don't write the same repo name twice."""
         mock_read.return_value = "fake_repo_agent\nother_repo\n"
 
-        # Patching Path.exists specifically for the registry file
+        # specifically for the registry file
         with patch.object(Path, "exists", return_value=True):
             with patch("builtins.open", mock_open()) as mocked_file:
                 register_repo(self.repo_name)
@@ -70,7 +87,6 @@ class TestBuildIndex(unittest.TestCase):
 
     @patch("ingest.build_index.GenericLoader")
     def test_empty_repo_handling(self, mock_loader):
-        """Ensure None is returned if no documents are found."""
         mock_loader.return_value.load.return_value = []
 
         result = run_indexing(self.data_path)

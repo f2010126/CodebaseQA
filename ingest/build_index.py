@@ -1,15 +1,15 @@
 import logging
+import shutil
 from pathlib import Path
-from pydantic_settings import BaseSettings
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_community.document_loaders.blob_loaders import FileSystemBlobLoader
-import shutil
+from langchain_community.document_loaders import TextLoader
 
 # setting up in one place
 
@@ -19,21 +19,15 @@ class Settings(BaseSettings):
     debug: bool = False
     repo_registry_path: Path = Path("data/repos.txt")
     vectorstore_root: Path = Path("vectorstore")
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
-
 logging.basicConfig(
     level=logging.INFO if not settings.debug else logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # default is the fake repo agent
-
 REPO_REGISTRY_PATH = "data/repos.txt"  # Hard coded. Change it when possible
 
 
@@ -75,23 +69,39 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
             # No what? just append I guess
             logger.error(f"Failed to clear existing index: {e}")
 
+    all_docs = []
     # load  glob and validation
     logger.info(f"Scanning {source_dir} for Python files...")
     # ensure glob or exclude patterns are tight to avoid .venv/ or __pycache__/
     # parser_threshold=500 means files smaller than 500 lines
     # get special AST treatment for splitting.
-
-    loader = GenericLoader(
+    py_loader = GenericLoader(
         blob_loader=FileSystemBlobLoader(str(source_dir), glob="**/*.py",
                                          suffixes=[".py"], show_progress=True),
         blob_parser=LanguageParser(
             language=Language.PYTHON, parser_threshold=500),
     )
 
+    # loaders for text
+    text_globs = ["README.md", "requirements.txt",
+                  "pyproject.toml", "Dockerfile"]
+    text_docs = []
+
+    for glob_pattern in text_globs:
+        try:
+            loader = GenericLoader(
+                blob_loader=FileSystemBlobLoader(
+                    str(source_dir), glob=glob_pattern),
+                blob_parser=LanguageParser(language=None)  # Plain text mode
+            )
+            text_docs.extend(loader.load())
+        except:
+            logger.warning(f"No files for pattern {glob_pattern}")
+
     try:
-        docs = loader.load()
-        if not docs:
-            logger.warning(f"No .py files found in {source_dir}")
+        all_docs = py_loader.load() + text_docs
+        if not all_docs:
+            logger.warning("No indexable files found.")
             return None
     except Exception as e:
         logger.error(f"Failed to load documents: {e}")
@@ -104,7 +114,7 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
         chunk_overlap=200  # catch indentation/headers
     )
 
-    chunks = splitter.split_documents(docs)
+    chunks = splitter.split_documents(all_docs)
     for chunk in chunks:
         chunk.metadata["repo"] = repo_name
         # LanguageParser adds "content_type" (e.g., 'function_definition')
@@ -112,7 +122,7 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
         chunk.metadata["source_file"] = Path(
             chunk.metadata.get("source", "")).name
 
-    # 3. Vector Store Management
+    # vector mgmt
     embeddings = get_embeddings_model()
 
     try:
