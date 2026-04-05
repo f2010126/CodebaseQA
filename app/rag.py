@@ -73,7 +73,12 @@ def get_context(repo_name: str, query: str) -> str:
 
     docs = retriever.invoke(query)
 
-    return "\n\n".join([
-        f"[{doc.metadata.get('source_file')}]: {doc.page_content}"
-        for doc in docs
-    ])
+    context_parts = []
+    for doc in docs:
+        source = doc.metadata.get('source_file', 'unknown')
+        # Content type helps the agent know if it's looking at a function or a class
+        ctype = doc.metadata.get('content_type', 'code')
+        context_parts.append(
+            f"--- FILE: {source} ({ctype}) ---\n{doc.page_content}")
+
+    return "\n\n".join(context_parts)
