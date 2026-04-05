@@ -21,16 +21,13 @@ REPO_REGISTRY_PATH = "data/repos.txt"  # Hard coded. Change it when possible
 
 def register_repo(repo_name):
     """repo registration"""
-    settings.repo_registry_path.parent.mkdir(parents=True, exist_ok=True)
+    repo_path = settings.repo_registry_path
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+    repos = set(repo_path.read_text().splitlines()
+                ) if repo_path.exists() else set()
+    repos.add(repo_name)
 
-    existing_repos = set()
-    if settings.repo_registry_path.exists():
-        existing_repos = {
-            line.strip() for line in settings.repo_registry_path.read_text().splitlines()}
-
-    if repo_name not in existing_repos:
-        with open(settings.repo_registry_path, "a") as f:
-            f.write(f"{repo_name}\n")
+    repo_path.write_text("\n".join(sorted(filter(None, repos))) + "\n")
 
 
 def get_embeddings_model():
@@ -43,7 +40,7 @@ def get_embeddings_model():
 
 def run_indexing(data_path: str = "data/fake_repo_agent"):
     # Indexing Pipeline
-    source_dir = Path(data_path)
+    source_dir = Path(data_path).resolve()  # enforcing absolute path
     repo_name = source_dir.name
     save_path = settings.vectorstore_root / repo_name
 
@@ -105,11 +102,18 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
 
     chunks = splitter.split_documents(all_docs)
     for chunk in chunks:
-        chunk.metadata["repo"] = repo_name
         # LanguageParser adds "content_type" (e.g., 'function_definition')
         # and "source" to metadata automatically.
-        chunk.metadata["source_file"] = Path(
-            chunk.metadata.get("source", "")).name
+        # also enforce the absolute path
+        chunk.metadata["repo"] = repo_name
+        full_path = Path(chunk.metadata.get("source", "")).resolve()
+        try:
+            # calculates the path starting from the repo root (data_path)
+            rel_path = full_path.relative_to(source_dir)
+            chunk.metadata["source_file"] = str(rel_path)
+        except ValueError:
+            # Fallback
+            chunk.metadata["source_file"] = full_path.name
 
     # vector mgmt
     embeddings = get_embeddings_model()
