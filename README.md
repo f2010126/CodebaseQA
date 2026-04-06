@@ -109,6 +109,7 @@ to build a practical **AI-powered code assistant**.
 - Switch to tool-calling agent (more stable than ReAct)
 - ~Better chunking strategy, say, AST (Abstract Syntax Tree), maybe a code graph~
 - ~Enable hybrid retrieval combining semantic search (embeddings) and keyword search (function names, variables)~
+- Add some kind of memory to allow the agent to remember stuff.
 - Add support for querying **remote repositories (e.g., GitHub)** 
 - Evaluation - define metrics
 - Packaging

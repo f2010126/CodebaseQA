@@ -67,6 +67,11 @@ def search_codebase(repo_name: str, query: str) -> str:
     - repo_name: The exact name of the repository to search (use list_indexed_repos to find names).
     - query: The technical term, function name, or concept you are looking for.
     """
+    # Prevent firing empty queries.
+    if not query or not query.strip():
+        logger.warning(f"[TOOL] Empty query blocked for repo: {repo_name}")
+        return "Error: Query was empty. Please provide technical keywords to search for."
+
     logger.debug(f"[TOOL] Searching {repo_name} for: {query}")
     try:
         # Delegation to rag.py
