@@ -1,11 +1,15 @@
 # app/agent.py main one
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_classic.agents import create_react_agent, AgentExecutor
-from langchain_core.tools import Tool
-from langsmith import Client
+from langchain_classic.agents import (
+    AgentExecutor,
+    create_tool_calling_agent,
+    tool,
+)
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import os
 from app.config import logger
-from app.tools import search_codebase
+from app.tools import search_codebase, get_file_content, list_indexed_repos
+from app.prompts import SYSTEM_PROMPT
 
 
 def load_repos():
@@ -21,99 +25,44 @@ def load_repos():
 
 def build_llm():
     try:
-        logger.info("Initializing LLM (Gemini)...")
-
-        llm = ChatGoogleGenerativeAI(
+        # gemini-2.5-flash-lite is highly optimized for tool calling
+        return ChatGoogleGenerativeAI(
             model="gemini-2.5-flash-lite",
             temperature=0
         )
-
-        logger.info("LLM initialized successfully")
-        return llm
-
     except Exception as e:
         logger.exception("Failed to initialize LLM")
         raise
 
-
-# Tools
-def build_tools():
-    try:
-        logger.info("Building tools...")
-
-        tools = [
-            Tool(
-                name="search_codebase",
-                func=search_codebase,
-                description="""
-Search the repository codebase for relevant files and code snippets.
-
-Use this tool when the user asks about:
-- code structure
-- functions
-- implementation details
-- logging
-- utilities
-- debugging code
-
-STRICT FORMAT RULES (VERY IMPORTANT):
-- Action must be: search_codebase
-- Action Input must be a plain string only
-- DO NOT use function-call syntax
-
-CORRECT:
-Action: search_codebase
-Action Input: logging
-
-INCORRECT:
-search_codebase(query="logging")
-search_codebase("logging")
-"""
-            )
-        ]
-
-        logger.info(f"{len(tools)} tool(s) registered successfully")
-        return tools
-
-    except Exception as e:
-        logger.exception("Failed to build tools")
-        raise
-
-
 # Builder
-def build_agent() -> AgentExecutor:
-    """
-    combine the functions
-    """
 
+
+def build_agent() -> AgentExecutor:
     try:
-        logger.info("Starting agent initialization pipeline...")
+        logger.info("Initializing Tool Calling Agent...")
 
         llm = build_llm()
-        tools = build_tools()
 
-        logger.info("Creating ReAct agent...")
-        repos = load_repos()
-        client = Client()
-        prompt = client.pull_prompt(
-            "hwchase17/react").partial(repos=", ".join(repos))
+        #  @tool decorator schemas used automatically
+        tools = [search_codebase, get_file_content, list_indexed_repos]
 
-        agent = create_react_agent(
-            llm=llm,
-            tools=tools,
-            prompt=prompt
-        )
+        # ChatPromptTemplate for modern tool-calling support
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
 
-        logger.info("Wrapping agent in AgentExecutor...")
+        #  tool calling agent
+        agent = create_tool_calling_agent(llm, tools, prompt)
 
-        executor = AgentExecutor(
+        return AgentExecutor(
             agent=agent,
             tools=tools,
-            verbose=True
+            verbose=True,
+            handle_parsing_errors=True
         )
-
-        logger.info("Agent initialized successfully")
-        return executor
 
     except Exception as e:
         logger.exception("Agent initialization failed")
