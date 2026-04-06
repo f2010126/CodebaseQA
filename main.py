@@ -1,4 +1,4 @@
-from app.agent import build_agent
+from app.agent import build_agent, chat_history_store
 from app.config import logger
 
 
@@ -16,10 +16,19 @@ def run_query(agent, query: str):
 def start_agent():
     print("--- Codebase Assistant Initializing ---")
     agent = get_agent()
+    # define a constant session ID for this CLI run TODO: add a config
+    session_config = {"configurable": {"session_id": "cli_session"}}
     print("\n[System] Checking available repositories...")
-    init_res = agent.invoke(
-        {"input": "List the available repositories and introduce yourself."})
-    print(f"\nAgent: {init_res.get('output')}")
+    try:
+        init_res = agent.invoke(
+            {"input": "List the available repositories and introduce yourself."},
+            config=session_config
+        )
+        print(f"\nAgent: {init_res.get('output')}")
+        chat_history_store["cli_session"].clear()
+        logger.info("Startup handshake cleared from memory.")
+    except Exception as e:
+        logger.error(f"Initialization failed: {e}")
 
     print("System ready. Type 'exit' to quit.")
     while True:
@@ -34,8 +43,9 @@ def start_agent():
 
             # The invocation remains the same, but the internal
             # 'verbose=True' in AgentExecutor will show the JSON tool calls.
-            result = run_query(agent, query)
-
+            result = agent.invoke({"input": query},
+                                  config=session_config  # use the history
+                                  )
             print("\n--- ANSWER ---\n")
             print(result.get("output", "No output returned"))
 

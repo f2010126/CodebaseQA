@@ -10,6 +10,18 @@ import os
 from app.config import logger
 from app.tools import search_codebase, get_file_content, list_indexed_repos
 from app.prompts import SYSTEM_PROMPT
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+
+# Small amount of memory managaement
+chat_history_store = {}
+
+
+def get_session_history(session_id: str):
+    if session_id not in chat_history_store:
+        chat_history_store[session_id] = InMemoryChatMessageHistory()
+    return chat_history_store[session_id]
 
 
 def load_repos():
@@ -49,20 +61,24 @@ def build_agent() -> AgentExecutor:
         # ChatPromptTemplate for modern tool-calling support
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
-            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
 
         #  tool calling agent
         agent = create_tool_calling_agent(llm, tools, prompt)
-
-        return AgentExecutor(
+        executor = AgentExecutor(
             agent=agent,
             tools=tools,
             verbose=True,
             handle_parsing_errors=True
         )
+
+        return RunnableWithMessageHistory(executor,
+                                          get_session_history,
+                                          input_messages_key="input",
+                                          history_messages_key="chat_history",)
 
     except Exception as e:
         logger.exception("Agent initialization failed")
