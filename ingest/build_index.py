@@ -10,6 +10,7 @@ from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_community.document_loaders.blob_loaders import FileSystemBlobLoader
 from langchain_community.retrievers import BM25Retriever
+import argparse
 
 # Import the centralized settings and logger
 from app.config import settings, logger
@@ -147,4 +148,14 @@ def run_indexing(data_path: str = "data/fake_repo_agent"):
 
 
 if __name__ == "__main__":
-    run_indexing()
+    parser = argparse.ArgumentParser(description="Run indexing")
+
+    parser.add_argument(
+        "--data-path",
+        default="data/fake_repo_agent",
+        help="Path to the data repo (default: data/fake_repo_agent)"
+    )
+
+    args = parser.parse_args()
+
+    run_indexing(data_path=args.data_path)

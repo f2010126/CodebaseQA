@@ -4,3 +4,7 @@ app/.DS_Store
 .env
 */__pycache__
 __pycache__
+.vscode
+data/Python-master
+data/vaultweaver
+vectorstore
