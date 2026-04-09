@@ -52,7 +52,10 @@ def build_llm():
 def build_agent() -> AgentExecutor:
     try:
         logger.info("Initializing Tool Calling Agent...")
-
+        # Get the actual list of folders in your vectorstore
+        indexed_repos = [d for d in os.listdir(
+            "vectorstore") if os.path.isdir(os.path.join("vectorstore", d))]
+        repo_context = f"\nAVAILABLE REPOSITORIES: {', '.join(indexed_repos)}"
         llm = build_llm()
 
         #  @tool decorator schemas used automatically
@@ -60,7 +63,7 @@ def build_agent() -> AgentExecutor:
 
         # ChatPromptTemplate for modern tool-calling support
         prompt = ChatPromptTemplate.from_messages([
-            ("system", SYSTEM_PROMPT),
+            ("system", SYSTEM_PROMPT + repo_context),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -72,7 +75,8 @@ def build_agent() -> AgentExecutor:
             agent=agent,
             tools=tools,
             verbose=True,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            return_intermediate_steps=True  # More debugging needed.
         )
 
         return RunnableWithMessageHistory(executor,

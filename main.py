@@ -1,5 +1,7 @@
 from app.agent import build_agent, chat_history_store
 from app.config import logger
+import langchain
+langchain.debug = True
 
 
 def get_agent():
@@ -46,6 +48,10 @@ def start_agent():
             result = agent.invoke({"input": query},
                                   config=session_config  # use the history
                                   )
+            # Debugging
+            if "intermediate_steps" in result:
+                for action, observation in result["intermediate_steps"]:
+                    print(f"Tool Used: {action.tool}")
             print("\n--- ANSWER ---\n")
             print(result.get("output", "No output returned"))
 
