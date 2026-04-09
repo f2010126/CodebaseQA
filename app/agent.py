@@ -14,6 +14,9 @@ from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
 
+MAX_ITR = 4
+EARLY_STOP = "generate"
+
 # Small amount of memory managaement
 chat_history_store = {}
 
@@ -76,7 +79,9 @@ def build_agent() -> AgentExecutor:
             tools=tools,
             verbose=True,
             handle_parsing_errors=True,
-            return_intermediate_steps=True  # More debugging needed.
+            return_intermediate_steps=True,  # More debugging needed.
+            max_iterations=MAX_ITR,  # Don't let it loop forever. Oh fun How very HPO
+            early_stopping_method=EARLY_STOP  # ok cool. Early stopping
         )
 
         return RunnableWithMessageHistory(executor,

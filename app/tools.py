@@ -3,6 +3,8 @@ from app.rag import get_context
 from langchain_core.tools import tool
 from pathlib import Path
 
+CONTENT_LIMIT = 15000
+
 
 @tool
 def list_indexed_repos() -> str:
@@ -51,8 +53,8 @@ def get_file_content(repo_name: str, relative_path: str) -> str:
 
     try:
         content = file_path.read_text(encoding="utf-8", errors="replace")
-        if len(content) > 30000:  # extreme cases
-            content = content[:30000] + "\n... [File Truncated] ..."
+        if len(content) > CONTENT_LIMIT:  # extreme cases
+            content = content[:CONTENT_LIMIT] + "\n... [File Truncated] ..."
         return f"--- CONTENT OF {relative_path} ---\n\n{content}"
     except Exception as e:
         # How to fix??

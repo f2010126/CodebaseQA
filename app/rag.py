@@ -8,6 +8,9 @@ import pickle
 from langchain_classic.retrievers import EnsembleRetriever
 from app.config import logger, settings
 
+BM25_K = 2
+FAISS_K = 2
+
 
 def load_hybrid_retriever(repo_name: str):
     save_path = settings.vectorstore_root / repo_name
@@ -32,7 +35,7 @@ def load_hybrid_retriever(repo_name: str):
             embeddings,
             allow_dangerous_deserialization=True  # controversial
         )
-        vector_retriever = vector_db.as_retriever(search_kwargs={"k": 5})
+        vector_retriever = vector_db.as_retriever(search_kwargs={"k": FAISS_K})
 
         # keyword search (BM25)
         bm25_path = save_path / "bm25_retriever.pkl"
@@ -42,7 +45,7 @@ def load_hybrid_retriever(repo_name: str):
             try:
                 with open(bm25_path, "rb") as f:
                     bm25_retriever = pickle.load(f)
-                    bm25_retriever.k = 5
+                    bm25_retriever.k = BM25_K
             except (pickle.UnpicklingError, EOFError) as e:
                 logger.warning(
                     f"BM25 index corrupted for {repo_name}: {e}. Using Vector-only.")
@@ -72,13 +75,21 @@ def get_context(repo_name: str, query: str) -> str:
         return "No context found."
 
     docs = retriever.invoke(query)
+    # Trying to avoid confusion with "deduplication" logic and labelled chunks
+    context_parts = []
+    seen_files = set()  # track files for repeats
 
     context_parts = []
     for doc in docs:
         source = doc.metadata.get('source_file', 'unknown')
         # Content type helps the agent know if it's looking at a function or a class
         ctype = doc.metadata.get('content_type', 'code')
-        context_parts.append(
-            f"--- FILE: {source} ({ctype}) ---\n{doc.page_content}")
+        # We saw this already.
+        prefix = "CONTINUED: " if source in seen_files else ""
+        seen_files.add(source)
 
+        context_parts.append(
+            f"--- {prefix}FILE: {source} ({ctype}) ---\n{doc.page_content}")
+
+    # return stuff thats more unique to avoid stuffing the model up. Mind you, this is because the model is a bit smaller
     return "\n\n".join(context_parts)
