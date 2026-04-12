@@ -1,42 +1,79 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from langchain_core.documents import Document
-from app.tools import search_codebase
+from pathlib import Path
+import shutil
+from app.tools import list_indexed_repos, get_file_content, search_codebase, settings
 
 
 class TestTools(unittest.TestCase):
+    def setUp(self):
+        # testing
+        self.test_root = Path("test_tool_data").resolve()
+        self.repo_name = "test_repo"
+        self.repo_dir = self.test_root / self.repo_name
+        self.repo_dir.mkdir(parents=True, exist_ok=True)
 
-    @patch("app.tools.get_retriever")
-    def test_search_codebase_success(self, mock_get_retriever):
-        mock_retriever = mock_get_retriever.return_value  # the actual value
-        mock_doc = Document(
-            page_content="def foo(): pass",
-            metadata={"source": "main.py"}
-        )
-        mock_retriever.invoke.return_value = [mock_doc]
+        #  settings
+        settings.data_path = self.test_root
+        settings.repo_registry_path = self.test_root / "repos.txt"
 
-        result = search_codebase("foo")
+    def tearDown(self):
+        if self.test_root.exists():
+            shutil.rmtree(self.test_root)
 
-        self.assertIn("main.py", result)
-        self.assertIn("def foo()", result)
+    def test_get_file_content_success(self):
+        """sucess"""
+        file_rel_path = "src/logic.py"
+        full_path = self.repo_dir / file_rel_path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text("print('hello world')")
 
-    @patch("app.tools.get_retriever")  # its a call now
-    def test_search_codebase_empty(self, mock_get_retriever):
-        mock_retriever = mock_get_retriever.return_value  # the actual value
-        mock_retriever.invoke.return_value = []
+        result = get_file_content.invoke({
+            "repo_name": self.repo_name,
+            "relative_path": file_rel_path
+        })
 
-        result = search_codebase("nothing")
+        self.assertIn("--- CONTENT OF src/logic.py ---", result)
+        self.assertIn("print('hello world')", result)
 
-        self.assertIn("No relevant code", result)
+    def test_security_block(self):
+        # Attempt to read the registry file from outside the repo root
+        result = get_file_content.invoke({
+            "repo_name": self.repo_name,
+            "relative_path": "../repos.txt"
+        })
 
-    @patch("app.tools.get_retriever")
-    def test_search_codebase_error(self, mock_get_retriever):
-        mock_retriever = mock_get_retriever.return_value  # the actual value
-        mock_retriever.invoke.side_effect = Exception("fail")
+        self.assertIn("Error: Access denied", result)
+        self.assertIn("outside repository boundaries", result)
 
-        result = search_codebase("error")
+    def test_content_missing(self):
+        """no files"""
+        result = get_file_content.invoke({
+            "repo_name": self.repo_name,
+            "relative_path": "i_dont_exist.py"
+        })
+        self.assertEqual(result, "Error: File 'i_dont_exist.py' not found.")
 
-        self.assertIn("Error retrieving", result)
+    def test_codebase_empty_query(self):
+        """ blocks empty strings."""
+        result = search_codebase.invoke({
+            "repo_name": self.repo_name,
+            "query": "   "
+        })
+        self.assertIn("Error: Query was empty", result)
+
+    @patch("app.tools.get_context")
+    def test_search_codebase(self, mock_get_context):
+        mock_get_context.return_value = "Fake context from RAG"
+
+        result = search_codebase.invoke({
+            "repo_name": self.repo_name,
+            "query": "how to login"
+        })
+
+        mock_get_context.assert_called_once_with(
+            self.repo_name, "how to login")
+        self.assertEqual(result, "Fake context from RAG")
 
 
 if __name__ == "__main__":
